@@ -1,99 +1,200 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agenda Online</title>
-  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css' rel='stylesheet' />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Agenda Musik</title>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <style>
-    body {
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
       font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f0f0f0;
+      height: 100%;
+      touch-action: manipulation;
     }
+
+    body {
+      background-image: url("https://i.pinimg.com/1200x/03/dd/d7/03ddd759676a47f6ad88b6b156e6a212.jpg");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .login-container, .main-container {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh;
+      color: #fff;
+    }
+
+    .login-container {
+      background-color: rgba(0, 0, 0, 0.6);
+    }
+
+    input, button, select {
+      margin: 10px 5px;
+      padding: 8px;
+      border: none;
+      border-radius: 5px;
+    }
+
+    button {
+      background-color: #1e90ff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #4682b4;
+    }
+
     #calendar {
-      max-width: 900px;
-      margin: auto;
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 1000px;
+      height: auto;
+      margin: 20px auto;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      border-radius: 15px;
+      overflow-x: auto;
     }
-    .fc-event-title {
-      white-space: normal !important;
-      overflow-wrap: break-word;
-      word-break: break-word;
+
+    .fc .fc-toolbar-title, .fc-toolbar-chunk, .fc-button {
+      color: white;
     }
+
+    .fc-button {
+      background-color: #555 !important;
+      border: none !important;
+    }
+
     .fc-event {
       background-color: transparent !important;
+      border: none;
+      white-space: normal !important;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      font-size: 0.8em;
+      padding: 2px;
     }
   </style>
 </head>
 <body>
-  <div id='calendar'></div>
+  <div class="login-container" id="login-container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 
-  <!-- FullCalendar -->
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.js'></script>
+  <div class="main-container" id="main-container">
+    <label for="fontColor">Warna Font Kegiatan:</label>
+    <input type="color" id="fontColor" value="#ffffff">
+    <div id="calendar"></div>
+  </div>
 
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore.js";
+  <script>
+    const USERNAME = "Kcmstudio";
+    const PASSWORD = "musik123";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCy2JxbeVOjJXSyoTXQupNu8qZ8Spgvz6w",
-      authDomain: "agendamusik-b870e.firebaseapp.com",
-      projectId: "agendamusik-b870e",
-      storageBucket: "agendamusik-b870e.firebasestorage.app",
-      messagingSenderId: "951978437976",
-      appId: "1:951978437976:web:bfda92d514cc9224ee892d",
-      measurementId: "G-2GYLM7E20W"
-    };
+    function login() {
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      if (u === USERNAME && p === PASSWORD) {
+        document.getElementById("login-container").style.display = "none";
+        document.getElementById("main-container").style.display = "flex";
+        initializeCalendar();
+      } else {
+        alert("Username atau password salah.");
+      }
+    }
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const agendaRef = collection(db, "agenda");
+    function saveEventsToStorage(events) {
+      localStorage.setItem("calendarEvents", JSON.stringify(events));
+    }
 
-    const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-      initialView: 'dayGridMonth',
-      editable: false,
-      selectable: true,
-      select: async function(info) {
-        const title = prompt('Masukkan nama kegiatan:');
-        if (title) {
-          const fontColor = prompt('Masukkan warna teks (misalnya: red, #0000ff, dll):') || '#000000';
-          await addDoc(agendaRef, {
-            title: title,
-            start: info.startStr,
-            allDay: true,
-            textColor: fontColor,
-            createdAt: new Date().toISOString()
-          });
+    function loadEventsFromStorage() {
+      const data = localStorage.getItem("calendarEvents");
+      return data ? JSON.parse(data) : [];
+    }
+
+    function initializeCalendar() {
+      const calendarEl = document.getElementById('calendar');
+      const fontColorInput = document.getElementById('fontColor');
+      const storedEvents = loadEventsFromStorage();
+
+      window.calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        editable: true,
+        selectable: true,
+        unselectAuto: false,
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,dayGridWeek,dayGridDay'
+        },
+        events: storedEvents,
+        select: function(info) {
+          setTimeout(() => {
+            const title = prompt("Masukkan judul kegiatan:");
+            if (title) {
+              const fontColor = fontColorInput.value;
+              const newEvent = {
+                title: title,
+                start: info.startStr,
+                allDay: true,
+                textColor: fontColor
+              };
+              window.calendar.addEvent(newEvent);
+              saveEventsToStorage(window.calendar.getEvents().map(e => ({
+                title: e.title,
+                start: e.startStr,
+                allDay: e.allDay,
+                textColor: e.textColor
+              })));
+            }
+          }, 10);
+        },
+        eventClick: function(info) {
+          setTimeout(() => {
+            const action = prompt(`Edit judul atau ketik 'hapus' untuk menghapus:\n${info.event.title}`);
+            if (action === 'hapus') {
+              info.event.remove();
+            } else if (action && action.trim() !== '') {
+              info.event.setProp('title', action.trim());
+            }
+            saveEventsToStorage(window.calendar.getEvents().map(e => ({
+              title: e.title,
+              start: e.startStr,
+              allDay: e.allDay,
+              textColor: e.textColor
+            })));
+          }, 10);
+        },
+        eventChange: function() {
+          saveEventsToStorage(window.calendar.getEvents().map(e => ({
+            title: e.title,
+            start: e.startStr,
+            allDay: e.allDay,
+            textColor: e.textColor
+          })));
         }
-      },
-      eventDidMount: function(info) {
-        if (info.event.extendedProps.textColor) {
-          info.el.querySelector('.fc-event-title').style.color = info.event.extendedProps.textColor;
-        }
-      },
-      events: []
-    });
-
-    calendar.render();
-
-    // Load events real-time dari Firebase
-    onSnapshot(query(agendaRef, orderBy("createdAt")), (snapshot) => {
-      calendar.getEvents().forEach(e => e.remove());
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        calendar.addEvent({
-          id: doc.id,
-          title: data.title,
-          start: data.start,
-          allDay: data.allDay,
-          textColor: data.textColor || '#000000'
-        });
       });
-    });
+
+      window.calendar.render();
+    }
+
+    window.onload = () => {
+      document.getElementById("login-container").style.display = "flex";
+    };
   </script>
 </body>
 </html>
