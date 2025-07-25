@@ -7,10 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     html, body {
       margin: 0;
       padding: 0;
@@ -18,14 +15,12 @@
       height: 100%;
       touch-action: manipulation;
     }
-
     body {
       background-image: url("https://i.pinimg.com/1200x/03/dd/d7/03ddd759676a47f6ad88b6b156e6a212.jpg");
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
     }
-
     .login-container, .main-container {
       display: none;
       justify-content: center;
@@ -34,48 +29,38 @@
       height: 100vh;
       color: #fff;
     }
-
     .login-container {
       background-color: rgba(0, 0, 0, 0.6);
     }
-
     input, button, select {
       margin: 10px 5px;
       padding: 8px;
       border: none;
       border-radius: 5px;
     }
-
     button {
       background-color: #1e90ff;
       color: white;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #4682b4;
     }
-
     #calendar {
       width: 90%;
       max-width: 1000px;
-      height: auto;
       margin: 20px auto;
       padding: 10px;
       background-color: rgba(0, 0, 0, 0.6);
       border-radius: 15px;
-      overflow-x: auto;
     }
-
     .fc .fc-toolbar-title, .fc-toolbar-chunk, .fc-button {
       color: white;
     }
-
     .fc-button {
       background-color: #555 !important;
       border: none !important;
     }
-
     .fc-event {
       background-color: transparent !important;
       border: none;
@@ -84,6 +69,21 @@
       overflow-wrap: break-word;
       font-size: 0.8em;
       padding: 2px;
+    }
+    #eventModal {
+      display: none;
+      position: fixed;
+      top: 30%;
+      left: 10%;
+      width: 80%;
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 9999;
+    }
+    #eventModal input {
+      width: 100%;
     }
   </style>
 </head>
@@ -101,9 +101,18 @@
     <div id="calendar"></div>
   </div>
 
+  <div id="eventModal">
+    <label for="eventTitle">Judul Kegiatan:</label>
+    <input type="text" id="eventTitle"><br>
+    <button onclick="saveEvent()">Simpan</button>
+    <button onclick="closeModal()">Batal</button>
+  </div>
+
   <script>
     const USERNAME = "Kcmstudio";
     const PASSWORD = "musik123";
+    let selectedInfo = null;
+    let selectedEvent = null;
 
     function login() {
       const u = document.getElementById("username").value;
@@ -126,9 +135,49 @@
       return data ? JSON.parse(data) : [];
     }
 
+    function openModal(info, isEdit = false) {
+      selectedInfo = info;
+      selectedEvent = isEdit ? info.event : null;
+      document.getElementById('eventTitle').value = isEdit ? info.event.title : '';
+      document.getElementById('eventModal').style.display = 'block';
+    }
+
+    function closeModal() {
+      document.getElementById('eventModal').style.display = 'none';
+      selectedInfo = null;
+      selectedEvent = null;
+    }
+
+    function saveEvent() {
+      const title = document.getElementById('eventTitle').value.trim();
+      const fontColor = document.getElementById('fontColor').value;
+      if (selectedEvent) {
+        if (title === 'hapus') {
+          selectedEvent.remove();
+        } else if (title) {
+          selectedEvent.setProp('title', title);
+        }
+      } else if (title && selectedInfo) {
+        const newEvent = {
+          title,
+          start: selectedInfo.startStr,
+          allDay: true,
+          textColor: fontColor
+        };
+        window.calendar.addEvent(newEvent);
+      }
+
+      saveEventsToStorage(window.calendar.getEvents().map(e => ({
+        title: e.title,
+        start: e.startStr,
+        allDay: e.allDay,
+        textColor: e.textColor
+      })));
+      closeModal();
+    }
+
     function initializeCalendar() {
       const calendarEl = document.getElementById('calendar');
-      const fontColorInput = document.getElementById('fontColor');
       const storedEvents = loadEventsFromStorage();
 
       window.calendar = new FullCalendar.Calendar(calendarEl, {
@@ -143,41 +192,10 @@
         },
         events: storedEvents,
         select: function(info) {
-          setTimeout(() => {
-            const title = prompt("Masukkan judul kegiatan:");
-            if (title) {
-              const fontColor = fontColorInput.value;
-              const newEvent = {
-                title: title,
-                start: info.startStr,
-                allDay: true,
-                textColor: fontColor
-              };
-              window.calendar.addEvent(newEvent);
-              saveEventsToStorage(window.calendar.getEvents().map(e => ({
-                title: e.title,
-                start: e.startStr,
-                allDay: e.allDay,
-                textColor: e.textColor
-              })));
-            }
-          }, 10);
+          openModal(info);
         },
         eventClick: function(info) {
-          setTimeout(() => {
-            const action = prompt(`Edit judul atau ketik 'hapus' untuk menghapus:\n${info.event.title}`);
-            if (action === 'hapus') {
-              info.event.remove();
-            } else if (action && action.trim() !== '') {
-              info.event.setProp('title', action.trim());
-            }
-            saveEventsToStorage(window.calendar.getEvents().map(e => ({
-              title: e.title,
-              start: e.startStr,
-              allDay: e.allDay,
-              textColor: e.textColor
-            })));
-          }, 10);
+          openModal(info, true);
         },
         eventChange: function() {
           saveEventsToStorage(window.calendar.getEvents().map(e => ({
