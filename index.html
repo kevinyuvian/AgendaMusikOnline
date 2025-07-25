@@ -3,9 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Agenda Musik</title>
+  <title>Agenda Musik - Firebase</title>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -70,21 +75,6 @@
       font-size: 0.8em;
       padding: 2px;
     }
-    #eventModal {
-      display: none;
-      position: fixed;
-      top: 30%;
-      left: 10%;
-      width: 80%;
-      background: white;
-      color: black;
-      padding: 20px;
-      border-radius: 10px;
-      z-index: 9999;
-    }
-    #eventModal input {
-      width: 100%;
-    }
   </style>
 </head>
 <body>
@@ -101,18 +91,24 @@
     <div id="calendar"></div>
   </div>
 
-  <div id="eventModal">
-    <label for="eventTitle">Judul Kegiatan:</label>
-    <input type="text" id="eventTitle"><br>
-    <button onclick="saveEvent()">Simpan</button>
-    <button onclick="closeModal()">Batal</button>
-  </div>
-
   <script>
     const USERNAME = "Kcmstudio";
     const PASSWORD = "musik123";
-    let selectedInfo = null;
-    let selectedEvent = null;
+
+    // === Firebase Config ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyCy2JxbeVOjJXSyoTXQupNu8qZ8Spgvz6w",
+      authDomain: "agendamusik-b870e.firebaseapp.com",
+      databaseURL: "https://agendamusik-b870e-default-rtdb.firebaseio.com",
+      projectId: "agendamusik-b870e",
+      storageBucket: "agendamusik-b870e.appspot.com",
+      messagingSenderId: "951978437976",
+      appId: "1:951978437976:web:bfda92d514cc9224ee892d",
+      measurementId: "G-2GYLM7E20W"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     function login() {
       const u = document.getElementById("username").value;
@@ -126,88 +122,65 @@
       }
     }
 
-    function saveEventsToStorage(events) {
-      localStorage.setItem("calendarEvents", JSON.stringify(events));
-    }
-
-    function loadEventsFromStorage() {
-      const data = localStorage.getItem("calendarEvents");
-      return data ? JSON.parse(data) : [];
-    }
-
-    function openModal(info, isEdit = false) {
-      selectedInfo = info;
-      selectedEvent = isEdit ? info.event : null;
-      document.getElementById('eventTitle').value = isEdit ? info.event.title : '';
-      document.getElementById('eventModal').style.display = 'block';
-    }
-
-    function closeModal() {
-      document.getElementById('eventModal').style.display = 'none';
-      selectedInfo = null;
-      selectedEvent = null;
-    }
-
-    function saveEvent() {
-      const title = document.getElementById('eventTitle').value.trim();
-      const fontColor = document.getElementById('fontColor').value;
-      if (selectedEvent) {
-        if (title === 'hapus') {
-          selectedEvent.remove();
-        } else if (title) {
-          selectedEvent.setProp('title', title);
-        }
-      } else if (title && selectedInfo) {
-        const newEvent = {
-          title,
-          start: selectedInfo.startStr,
-          allDay: true,
-          textColor: fontColor
-        };
-        window.calendar.addEvent(newEvent);
-      }
-
-      saveEventsToStorage(window.calendar.getEvents().map(e => ({
-        title: e.title,
-        start: e.startStr,
-        allDay: e.allDay,
-        textColor: e.textColor
-      })));
-      closeModal();
-    }
-
     function initializeCalendar() {
       const calendarEl = document.getElementById('calendar');
-      const storedEvents = loadEventsFromStorage();
+      const fontColorInput = document.getElementById('fontColor');
 
-      window.calendar = new FullCalendar.Calendar(calendarEl, {
+      const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         editable: true,
         selectable: true,
-        unselectAuto: false,
         headerToolbar: {
           left: 'prev,next today',
           center: 'title',
           right: 'dayGridMonth,dayGridWeek,dayGridDay'
         },
-        events: storedEvents,
+        events: function(fetchInfo, successCallback, failureCallback) {
+          db.ref("events").once("value", (snapshot) => {
+            const data = snapshot.val() || {};
+            const events = Object.values(data);
+            successCallback(events);
+          });
+        },
         select: function(info) {
-          openModal(info);
+          const title = prompt("Masukkan judul kegiatan:");
+          if (title) {
+            const fontColor = fontColorInput.value;
+            const newEvent = {
+              title: title,
+              start: info.startStr,
+              allDay: true,
+              textColor: fontColor,
+              id: Date.now().toString()
+            };
+            db.ref("events/" + newEvent.id).set(newEvent);
+            calendar.addEvent(newEvent);
+          }
         },
         eventClick: function(info) {
-          openModal(info, true);
+          const action = prompt(`Edit judul atau ketik 'hapus' untuk menghapus:\n${info.event.title}`);
+          if (action === 'hapus') {
+            db.ref("events/" + info.event.id).remove();
+            info.event.remove();
+          } else if (action && action.trim() !== '') {
+            info.event.setProp('title', action.trim());
+            db.ref("events/" + info.event.id).update({ title: action.trim() });
+          }
         },
-        eventChange: function() {
-          saveEventsToStorage(window.calendar.getEvents().map(e => ({
-            title: e.title,
-            start: e.startStr,
-            allDay: e.allDay,
-            textColor: e.textColor
-          })));
+        eventChange: function(info) {
+          const updatedEvent = {
+            title: info.event.title,
+            start: info.event.startStr,
+            allDay: info.event.allDay,
+            textColor: info.event.extendedProps.textColor,
+            id: info.event.id
+          };
+          db.ref("events/" + info.event.id).set(updatedEvent);
         }
       });
 
-      window.calendar.render();
+      calendar.render();
+      window.calendar = calendar;
     }
 
     window.onload = () => {
