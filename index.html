@@ -158,13 +158,10 @@
           }
         },
         eventClick: function(info) {
-          const action = prompt(`Edit judul atau ketik 'hapus' untuk menghapus:\n${info.event.title}`);
-          if (action === 'hapus') {
+          const confirmDelete = confirm(`Ingin menghapus kegiatan: "${info.event.title}"?`);
+          if (confirmDelete) {
             db.ref("events/" + info.event.id).remove();
             info.event.remove();
-          } else if (action && action.trim() !== '') {
-            info.event.setProp('title', action.trim());
-            db.ref("events/" + info.event.id).update({ title: action.trim() });
           }
         },
         eventChange: function(info) {
